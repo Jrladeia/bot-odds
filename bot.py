@@ -21,7 +21,7 @@ MERCADO_URL = os.getenv(
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-ODD_ALERTA = float(os.getenv("ODD_ALERTA", "1.40"))
+ODD_ALERTA = float(os.getenv("ODD_ALERTA", "1.15"))
 INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", "2"))
 MERCADO_NOME = os.getenv("MERCADO_NOME", "Rio de Janeiro")
 
