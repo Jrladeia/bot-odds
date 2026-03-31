@@ -1,38 +1,35 @@
 import os
 import time
+import threading
 import traceback
 from datetime import datetime
 
 import requests
+from flask import Flask
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 
 # =========================
 # CONFIG VIA VARIÁVEIS
 # =========================
-LOGIN_URL = os.getenv("LOGIN_URL", "https://app.previsao.io/")
 MERCADO_URL = os.getenv(
     "MERCADO_URL",
     "https://app.previsao.io/evento/20903-market/rio-de-janeiro-rj-at-20903"
 )
-
-PREVISAO_USER = os.getenv("PREVISAO_USER", "")
-PREVISAO_PASS = os.getenv("PREVISAO_PASS", "")
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 ODD_ALERTA = float(os.getenv("ODD_ALERTA", "1.40"))
 INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", "2"))
-
 MERCADO_NOME = os.getenv("MERCADO_NOME", "Rio de Janeiro")
 
+PORT = int(os.getenv("PORT", "10000"))
 
 ultimo_alerta_enviado = False
+
+app = Flask(__name__)
 
 
 def criar_driver():
@@ -49,6 +46,10 @@ def criar_driver():
 
 
 def enviar_telegram(texto: str):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⚠️ TELEGRAM_TOKEN ou TELEGRAM_CHAT_ID não configurados.")
+        return
+
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
     payload = {
@@ -96,34 +97,6 @@ def enviar_status_inicial():
     enviar_telegram(mensagem)
 
 
-def fazer_login(driver):
-    wait = WebDriverWait(driver, 30)
-    driver.get(LOGIN_URL)
-
-    # Ajuste os seletores se o HTML do site estiver diferente
-    campo_email = wait.until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="email"]'))
-    )
-    campo_senha = wait.until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="password"]'))
-    )
-
-    campo_email.clear()
-    campo_email.send_keys(PREVISAO_USER)
-
-    campo_senha.clear()
-    campo_senha.send_keys(PREVISAO_PASS)
-
-    botao_entrar = driver.find_element(
-        By.XPATH,
-        "//button[contains(., 'Entrar') or contains(., 'Login') or contains(., 'Acessar')]"
-    )
-    botao_entrar.click()
-
-    time.sleep(5)
-    print("✅ Login realizado")
-
-
 def abrir_mercado(driver):
     driver.get(MERCADO_URL)
     time.sleep(5)
@@ -165,7 +138,6 @@ def loop_monitoramento():
     driver = criar_driver()
 
     try:
-        fazer_login(driver)
         abrir_mercado(driver)
         enviar_status_inicial()
 
@@ -190,7 +162,7 @@ def loop_monitoramento():
         driver.quit()
 
 
-if __name__ == "__main__":
+def iniciar_bot():
     while True:
         try:
             loop_monitoramento()
@@ -201,9 +173,21 @@ if __name__ == "__main__":
             try:
                 enviar_telegram(
                     "⚠️ *Bot reiniciando após erro*\n\n"
-                    "Verifique os logs no Railway."
+                    "Verifique os logs no Render."
                 )
             except Exception:
                 pass
 
             time.sleep(10)
+
+
+@app.route("/")
+def home():
+    return "Bot rodando ✅"
+
+
+if __name__ == "__main__":
+    t = threading.Thread(target=iniciar_bot, daemon=True)
+    t.start()
+
+    app.run(host="0.0.0.0", port=PORT)
