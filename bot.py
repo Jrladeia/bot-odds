@@ -22,12 +22,13 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 ODD_ALERTA = float(os.getenv("ODD_ALERTA", "1.40"))
-INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", "2"))
+INTERVALO_SEGUNDOS = float(os.getenv("INTERVALO_SEGUNDOS", "1"))
 MERCADO_NOME = os.getenv("MERCADO_NOME", "Rio de Janeiro")
 
 PORT = int(os.getenv("PORT", "10000"))
 
 ultimo_alerta_enviado = False
+leituras_acima_limite = 0
 
 app = Flask(__name__)
 
@@ -80,7 +81,8 @@ def enviar_alerta(odd: float):
         f"📍 Mercado: {MERCADO_NOME}\n"
         f"📈 Odd NÃO: *{odd:.2f}x*\n"
         f"🕒 Horário: {agora}\n\n"
-        "⚡ Condição de entrada detectada!"
+        "⚡ Condição de entrada detectada!\n"
+        "⚠️ A odd pode oscilar rapidamente após o alerta."
     )
 
     enviar_telegram(mensagem)
@@ -92,6 +94,7 @@ def enviar_status_inicial():
         "✅ *Bot iniciado na nuvem*\n\n"
         f"📍 Mercado: {MERCADO_NOME}\n"
         f"🎯 Alerta configurado para odd NÃO >= *{ODD_ALERTA:.2f}x*\n"
+        f"⏱️ Intervalo de leitura: *{INTERVALO_SEGUNDOS}s*\n"
         f"🔗 Link monitorado:\n{MERCADO_URL}"
     )
     enviar_telegram(mensagem)
@@ -134,6 +137,7 @@ def pegar_odd_nao(driver):
 
 def loop_monitoramento():
     global ultimo_alerta_enviado
+    global leituras_acima_limite
 
     driver = criar_driver()
 
@@ -149,12 +153,16 @@ def loop_monitoramento():
                 time.sleep(1)
                 continue
 
-            if odd >= ODD_ALERTA and not ultimo_alerta_enviado:
+            if odd >= ODD_ALERTA:
+                leituras_acima_limite += 1
+                print(f"Leituras acima do limite: {leituras_acima_limite}")
+            else:
+                leituras_acima_limite = 0
+                ultimo_alerta_enviado = False
+
+            if leituras_acima_limite >= 2 and not ultimo_alerta_enviado:
                 enviar_alerta(odd)
                 ultimo_alerta_enviado = True
-
-            elif odd < ODD_ALERTA:
-                ultimo_alerta_enviado = False
 
             time.sleep(INTERVALO_SEGUNDOS)
 
